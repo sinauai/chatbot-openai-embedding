@@ -64,6 +64,7 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const [showExamples, setShowExamples] = useState(true)
+  const [titleData, setTitleData] = useState({ title: 'Halo, Sahabat Kompas', subtitle: 'Silakan ajukan pertanyaan terkait artikel yang Anda baca. Jawaban dibuat berdasarkan berita di Kompas.id.' })
 
   // Deteksi posisi scroll sebelum pesan baru masuk
   useEffect(() => {
@@ -105,7 +106,21 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
       }
     }
 
+    // Fetch title data from API
+    async function fetchTitleData() {
+      try {
+        const response = await fetch("/api/title")
+        const data = await response.json()
+        if (data.title && data.subtitle) {
+          setTitleData({ title: data.title, subtitle: data.subtitle })
+        }
+      } catch (error) {
+        console.error("Failed to fetch title data:", error)
+      }
+    }
+
     fetchNewsMetadata()
+    fetchTitleData()
   }, [])
 
   useEffect(() => {
@@ -226,9 +241,9 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
 
   const welcomeHeader = (
     <header className="m-auto flex max-w-96 flex-col gap-5 text-center py-8">
-      <h1 className="text-2xl font-semibold leading-none tracking-tight">Halo, Sahabat Kompas</h1>
+      <h1 className="text-2xl font-semibold leading-none tracking-tight">{titleData.title}</h1>
       <p className="text-muted-foreground text-sm">
-        Silakan ajukan pertanyaan terkait artikel yang Anda baca. Jawaban dibuat berdasarkan berita di Kompas.id.
+        {titleData.subtitle}
       </p>
     </header>
   )
