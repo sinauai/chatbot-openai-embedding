@@ -62,6 +62,51 @@ Setiap objek harus memiliki properti:
 
 **Catatan**: Chatbot akan menggunakan objek pertama dalam array. Jika file tidak ditemukan atau terjadi error, chatbot akan menggunakan nilai default yang sudah di-hardcode.
 
+## Proses Chunking dan Embedding Otomatis
+
+Chatbot ini menggunakan sistem chunking dan embedding otomatis untuk memproses konten berita:
+
+### 🔄 Proses Otomatis
+- **Chunking**: Artikel dipecah menjadi chunks berukuran 800 karakter dengan overlap 100 karakter
+- **Embedding**: Setiap chunk diproses menggunakan OpenAI text-embedding-3-small model
+- **Build-time Processing**: Script `prepare-embeddings.js` dijalankan otomatis saat build
+- **Output**: Hasil disimpan di `data/chunks.json` dan `data/embeddings.json`
+
+### 📋 Konfigurasi Environment Variables
+Untuk menjalankan proses embedding, diperlukan environment variable:
+```
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### 🚀 Deploy ke Vercel
+1. Fork repository ini
+2. Ubah file `news.json`, `title.json`, dan `questions.json` sesuai kebutuhan
+3. Set environment variable `OPENAI_API_KEY` di Vercel dashboard
+4. Deploy - proses chunking dan embedding akan berjalan otomatis!
+
+## Tracking Analytics dengan Supabase (Opsional)
+
+Chatbot mendukung tracking interaksi pengguna menggunakan Supabase:
+
+### 📊 Data yang Ditrack
+- URL artikel yang diklik
+- Judul artikel
+- Session ID pengguna
+- User agent
+- Referrer message ID
+- Timestamp interaksi
+
+### 🗄️ Setup Database
+1. Buat project baru di Supabase
+2. Jalankan SQL script yang ada di `SUPABASE_SETUP.md`
+3. Set environment variables di Vercel:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+**Catatan**: Tracking bersifat opsional. Jika environment variables Supabase tidak diset, chatbot tetap berfungsi normal tanpa tracking.
+
 ## Cara Menggunakan Embed
 
 Untuk menyematkan chatbot di website lain, gunakan kode iframe berikut:

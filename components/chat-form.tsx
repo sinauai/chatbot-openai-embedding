@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, Suspense, useRef } from "react"
+import React, { useState, useEffect, Suspense, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { useChat } from "ai/react"
 import { ArrowUpIcon, Loader2 } from "lucide-react"
@@ -12,6 +10,7 @@ import { AutoResizeTextarea } from "@/components/autoresize-textarea"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import { useEmbedMode } from "@/hooks/use-embed-mode"
+import { trackArticleClick } from "@/lib/track-click"
 
 type Source = {
   title: string
@@ -64,7 +63,24 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const [showExamples, setShowExamples] = useState(true)
+  const [exampleQuestions, setExampleQuestions] = useState<string[]>([])
+  const [questionsLoaded, setQuestionsLoaded] = useState(false)
   const [titleData, setTitleData] = useState({ title: 'Halo, Sahabat Kompas', subtitle: 'Silakan ajukan pertanyaan terkait artikel yang Anda baca. Jawaban dibuat berdasarkan berita di Kompas.id.' })
+
+  // Fetch example questions once on component mount
+  useEffect(() => {
+    if (!questionsLoaded) {
+      fetch('/api/questions')
+        .then(res => res.json())
+        .then(data => {
+          setExampleQuestions(data.questions || [])
+          setQuestionsLoaded(true)
+        })
+        .catch(() => {
+          setQuestionsLoaded(true)
+        })
+    }
+  }, [questionsLoaded])
 
   // Deteksi posisi scroll sebelum pesan baru masuk
   useEffect(() => {
@@ -270,15 +286,23 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
           {/* Sources section */}
           {message.role === "assistant" && messageSources[message.id] && messageSources[message.id].length > 0 && (
             <div className="mt-1 self-start text-xs text-gray-500">
-              <p className="font-medium">Sumber:</p>
-              <ul className="mt-1 space-y-1">
+              <p className="font-medium mb-2">Sumber:</p>
+              <ul className="mt-1 space-y-2 list-disc list-inside pl-2">
                 {messageSources[message.id].map((source, idx) => (
-                  <li key={idx}>
+                  <li key={idx} className="leading-relaxed">
                     <Link
                       href={source.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-600 hover:underline hover:text-blue-800 transition-colors duration-200"
+                      onClick={() => {
+                        // Track article click without affecting main functionality
+                        trackArticleClick({
+                          url: source.url,
+                          title: source.title,
+                          messageId: message.id
+                        })
+                      }}
                     >
                       {source.title}
                     </Link>
@@ -301,14 +325,23 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
     </div>
   )
 
-  function ExampleQuestions({ onSelect }: { onSelect: (q: string) => void }) {
-    const [questions, setQuestions] = useState<string[]>([]);
-
-    useEffect(() => {
-      fetch('/api/questions')
-        .then(res => res.json())
-        .then(data => setQuestions(data.questions || []));
-    }, []);
+  const ExampleQuestions = React.memo(({ questions, isLoading, onSelect }: { 
+    questions: string[], 
+    isLoading: boolean, 
+    onSelect: (q: string) => void 
+  }) => {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col gap-2 mb-6">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="border border-gray-200 bg-gray-50 rounded-lg px-4 py-2 h-10 animate-pulse"
+            />
+          ))}
+        </div>
+      );
+    }
 
     if (questions.length === 0) return null;
 
@@ -316,7 +349,7 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
       <div className="flex flex-col gap-2 mb-6">
         {questions.map((q, idx) => (
           <button
-            key={idx}
+            key={`${q}-${idx}`}
             className="border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-900 rounded-lg px-4 py-2 text-left transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-300 text-[0.97rem]"
             onClick={() => onSelect(q)}
             type="button"
@@ -326,7 +359,7 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
         ))}
       </div>
     );
-  }
+  });
 
   return (
     <main
@@ -341,22 +374,29 @@ function ChatFormContent({ className, ...props }: React.ComponentProps<"form">) 
         {processedMessages.length === 0 ? (
           <>
             {welcomeHeader}
-            {showExamples && <ExampleQuestions onSelect={handleExampleSelect} />}
+            {showExamples && <ExampleQuestions 
+              questions={exampleQuestions} 
+              isLoading={!questionsLoaded} 
+              onSelect={handleExampleSelect} 
+            />}
           </>
         ) : messageList}
       </div>
       <form
         id="chat-form-main"
         onSubmit={handleSubmit}
-        className="border-input bg-background focus-within:ring-ring/10 relative mb-6 flex items-center rounded-[16px] border px-3 py-1.5 pr-8 text-sm focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-0 w-full max-w-[90%] mx-auto"
+        className="border-input bg-background focus-within:ring-ring/10 relative mb-6 flex items-start rounded-[16px] border text-sm focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-0 w-full max-w-[90%] mx-auto"
+        style={{ minHeight: '56px' }}
       >
-        <AutoResizeTextarea
-          onKeyDown={handleKeyDown}
-          onChange={(v) => setInput(v)}
-          value={input}
-          placeholder="Ketik pertanyaan Anda..."
-          className="placeholder:text-muted-foreground flex-1 bg-transparent focus:outline-none"
-        />
+        <div className="flex-1 px-3 py-2">
+          <AutoResizeTextarea
+            onKeyDown={handleKeyDown}
+            onChange={(v) => setInput(v)}
+            value={input}
+            placeholder="Ketik pertanyaan Anda..."
+            className="placeholder:text-muted-foreground"
+          />
+        </div>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>

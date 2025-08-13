@@ -10,30 +10,65 @@ interface AutoResizeTextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAr
 
 export function AutoResizeTextarea({ className, value, onChange, ...props }: AutoResizeTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [currentHeight, setCurrentHeight] = React.useState(40)
 
-  const resizeTextarea = () => {
-    const textarea = textareaRef.current
-    if (textarea) {
-      textarea.style.height = "auto"
-      textarea.style.height = `${textarea.scrollHeight}px`
+  const resizeTextarea = React.useCallback(() => {
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current)
     }
-  }
+    
+    resizeTimeoutRef.current = setTimeout(() => {
+      const textarea = textareaRef.current
+      if (textarea) {
+        // Temporarily set height to auto to get scrollHeight
+        const originalHeight = textarea.style.height
+        textarea.style.height = "auto"
+        const scrollHeight = textarea.scrollHeight
+        textarea.style.height = originalHeight
+        
+        const newHeight = Math.min(Math.max(scrollHeight, 40), 320) // min 40px, max 320px
+        
+        if (newHeight !== currentHeight) {
+          setCurrentHeight(newHeight)
+        }
+      }
+    }, 10) // Small delay to prevent excessive calls
+  }, [currentHeight])
 
   useEffect(() => {
     resizeTextarea()
-  }, [value])
+    
+    return () => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current)
+      }
+    }
+  }, [value, resizeTextarea])
 
   return (
-    <textarea
-      {...props}
-      value={value}
-      ref={textareaRef}
-      rows={1}
-      onChange={(e) => {
-        onChange(e.target.value)
-        resizeTextarea()
-      }}
-      className={cn("resize-none min-h-4 max-h-80", className)}
-    />
+    <div className="relative flex-1" style={{ minHeight: '40px' }}>
+      <textarea
+        {...props}
+        value={value}
+        ref={textareaRef}
+        rows={1}
+        onChange={(e) => {
+          onChange(e.target.value)
+          resizeTextarea()
+        }}
+        className={cn(
+          "resize-none w-full border-0 outline-0 bg-transparent transition-all duration-200 ease-out",
+          "focus:outline-none focus:ring-0 focus:border-0",
+          className
+        )}
+        style={{
+          minHeight: '40px',
+          height: `${currentHeight}px`,
+          padding: '8px 0',
+          lineHeight: '1.5'
+        }}
+      />
+    </div>
   )
 }
